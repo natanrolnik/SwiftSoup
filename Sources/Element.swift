@@ -916,13 +916,21 @@ open class Element: Node {
      * @see #ownText()
      * @see #textNodes()
      */
-    class textNodeVisitor: NodeVisitor {
+    class TextNodeVisitor: NodeVisitor {
         let accum: StringBuilder
         let trimAndNormaliseWhitespace: Bool
-        init(_ accum: StringBuilder, trimAndNormaliseWhitespace: Bool) {
+        let respectLinebreaks: Bool
+
+        init(
+            _ accum: StringBuilder,
+            trimAndNormaliseWhitespace: Bool,
+            respectLinebreaks: Bool
+        ) {
             self.accum = accum
             self.trimAndNormaliseWhitespace = trimAndNormaliseWhitespace
+            self.respectLinebreaks = respectLinebreaks
         }
+
         public func head(_ node: Node, _ depth: Int) {
             if let textNode = (node as? TextNode) {
                 if trimAndNormaliseWhitespace {
@@ -934,7 +942,11 @@ open class Element: Node {
                 if !accum.isEmpty &&
                     (element.isBlock() || element._tag.getName() == "br") &&
                     !TextNode.lastCharIsWhitespace(accum) {
-                    accum.append(" ")
+                    if element._tag.getName() == "br" && respectLinebreaks {
+                        accum.append("\n")
+                    } else {
+                        accum.append(" ")
+                    }
                 }
             }
         }
@@ -942,9 +954,17 @@ open class Element: Node {
         public func tail(_ node: Node, _ depth: Int) {
         }
     }
-    public func text(trimAndNormaliseWhitespace: Bool = true)throws->String {
+    public func text(
+        trimAndNormaliseWhitespace: Bool = true,
+        respectLinebreaks: Bool = true
+    ) throws -> String {
         let accum: StringBuilder = StringBuilder()
-        try NodeTraversor(textNodeVisitor(accum, trimAndNormaliseWhitespace: trimAndNormaliseWhitespace)).traverse(self)
+        let visitor = TextNodeVisitor(
+            accum,
+            trimAndNormaliseWhitespace: trimAndNormaliseWhitespace,
+            respectLinebreaks: respectLinebreaks
+        )
+        try NodeTraversor(visitor).traverse(self)
         let text = accum.toString()
         if trimAndNormaliseWhitespace {
             return text.trim()
